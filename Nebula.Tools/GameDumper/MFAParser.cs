@@ -9,6 +9,7 @@ using Nebula.Core.Data.Chunks.ObjectChunks.ObjectCommon;
 using Nebula.Core.Memory;
 using Nebula.Core.Utilities;
 using System.Diagnostics;
+using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -31,7 +32,7 @@ namespace Nebula.Tools.GameDumper
         public void Execute()
         {
             PackageData dat = NebulaCore.PackageData;
-            string path = "Dumps\\" + Utilities.ClearName(dat.AppName) + "\\";
+            string path = "Dumps/" + Utilities.ClearName(dat.AppName) + "/";
             Directory.CreateDirectory(path);
             ByteWriter writer = new ByteWriter(new FileStream(path + Path.ChangeExtension(Utilities.ClearName(Path.GetFileName(string.IsNullOrEmpty(dat.EditorFilename) ? dat.AppName + ".mfa" : dat.EditorFilename)), ".mfa"), FileMode.Create));
 
@@ -87,7 +88,7 @@ namespace Nebula.Tools.GameDumper
                 AppIcons.IconHandles = new uint[2];
                 AppIcons.IconHandles[0] = 1;
                 AppIcons.IconHandles[1] = 0;
-                Bitmap MMFAppIcon = new Bitmap(Bitmap.FromFile("Tools\\ObjectIcons\\MMFApplication.png"));
+                Bitmap MMFAppIcon = new Bitmap(Bitmap.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFApplication.png")));
                 int[] iconSizes = new int[5] { 256, 128, 48, 32, 16};
 
                 for (int i = 0; i < 5; i++)
@@ -123,7 +124,7 @@ namespace Nebula.Tools.GameDumper
             {
                 Task task = Task.Factory.StartNew(() =>
                 {
-                    object iconBmpo = "Tools\\ObjectIcons\\MMFActive.png";
+                    object iconBmpo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFActive.png");
                     try
                     {
                         iconBmpo = GenerateObjectIcon(objectInfo);
@@ -153,7 +154,7 @@ namespace Nebula.Tools.GameDumper
                     }
                     else
                     {
-                        string activeIconPath = "Tools\\ObjectIcons\\MMFActive.png";
+                        string activeIconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFActive.png");
                         lock (IconBmps)
                         {
                             if (!IconBmps.ContainsKey(activeIconPath))
@@ -346,7 +347,7 @@ namespace Nebula.Tools.GameDumper
                         }
                     }
                     //bmp0?.DisposeBmp();
-                    return "Tools\\ObjectIcons\\MMFQuickBackdrop.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFQuickBackdrop.png");
                 case 1:
                     Image bmp1 = imgBnk[((ObjectBackdrop)objectInfo.Properties).Image];
                     lock (bmp1)
@@ -358,7 +359,7 @@ namespace Nebula.Tools.GameDumper
                         }
                     }
                     //bmp1?.DisposeBmp();
-                    return "Tools\\ObjectIcons\\MMFBackdrop.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFBackdrop.png");
                 case 2:
                     Image bmp2 = imgBnk[((ObjectCommon)objectInfo.Properties).ObjectAnimations.Animations[0].Directions[0].Frames[0]];
                     lock (bmp2)
@@ -370,15 +371,15 @@ namespace Nebula.Tools.GameDumper
                         }
                     }
                     //bmp2?.DisposeBmp();
-                    return "Tools\\ObjectIcons\\MMFActive.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFActive.png");
                 case 3:
-                    return "Tools\\ObjectIcons\\MMFString.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFString.png");
                 case 4:
-                    return "Tools\\ObjectIcons\\MMFQ&A.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFQ&A.png");
                 case 5:
-                    return "Tools\\ObjectIcons\\MMFScore.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFScore.png");
                 case 6:
-                    return "Tools\\ObjectIcons\\MMFLives.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFLives.png");
                 case 7:
                     Bitmap bmp7 = getCounterBmp(((ObjectCommon)objectInfo.Properties).ObjectCounter, ((ObjectCommon)objectInfo.Properties).ObjectValue);
                     if (MakeIcon(bmp7, out Bitmap bmp07))
@@ -387,18 +388,18 @@ namespace Nebula.Tools.GameDumper
                         return bmp07;
                     }
                     bmp7?.Dispose();
-                    return "Tools\\ObjectIcons\\MMFCounter.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFCounter.png");
                 case 8:
-                    return "Tools\\ObjectIcons\\MMFFormattedText.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFFormattedText.png");
                 case 9:
-                    return "Tools\\ObjectIcons\\MMFSubApplication.png";
+                    return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFSubApplication.png");
                 default:
                     foreach (Extension posExt in NebulaCore.PackageData.Extensions.Exts.Values)
-                        if (posExt.Handle == objectInfo.Header.Type - 32 && File.Exists("Tools\\ObjectIcons\\" + posExt.Name + ".png"))
-                            return "Tools\\ObjectIcons\\" + posExt.Name + ".png";
+                        if (posExt.Handle == objectInfo.Header.Type - 32 && File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", posExt.Name + ".png")))
+                            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", posExt.Name + ".png");
                     break;
             }
-            return "Tools\\ObjectIcons\\MMFActive.png";
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "ObjectIcons", "MMFActive.png");
         }
 
         public bool MakeIcon(Bitmap source, out Bitmap output)
