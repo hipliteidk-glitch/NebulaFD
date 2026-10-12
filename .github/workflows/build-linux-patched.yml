@@ -1,0 +1,29 @@
+name: Build Patched Linux
+on:
+  workflow_dispatch:
+  push:
+    branches: [ 2024-nebula ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Patch gdiplus
+        run: |
+          sed -i 's/.*Image\.FromFile.*/            System.Drawing.Image icon = null; \/\/ PATCHED/g' Nebula.Tools/GameDumper/MFAParser.cs
+          grep -n "icon" Nebula.Tools/GameDumper/MFAParser.cs | head
+      - name: Publish
+        run: |
+          cd Nebula.Headless || cd Nebula.CLI
+          dotnet publish -c Release -o ./publish
+          mkdir -p ./publish/Tools/ObjectIcons
+          touch ./publish/Tools/ObjectIcons/MMFApplication.png
+          echo '{"ignore_sounds":true,"ignore_music":true}' > ./publish/config.json
+          ls -lh ./publish/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NebulaFD-Linux-Patched
+          path: "**/publish"
