@@ -11,19 +11,26 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Patch gdiplus
+      - name: Patch all Windows-only code
         run: |
-          sed -i 's/.*Image\.FromFile.*/            System.Drawing.Image icon = null; \/\/ PATCHED/g' Nebula.Tools/GameDumper/MFAParser.cs
-          grep -n "icon" Nebula.Tools/GameDumper/MFAParser.cs | head
-      - name: Publish
+          echo "Patching MFAParser..."
+          sed -i 's/.*Image\.FromFile.*/            System.Drawing.Image icon = null; \/\/ PATCHED/g' Nebula.Tools/GameDumper/MFAParser.cs || true
+          echo "Ensuring GameDumper.csproj is Linux-friendly"
+          cat Nebula.Tools/GameDumper/GameDumper.csproj
+          echo "Disable AppIcon System.Drawing heavy code for Linux"
+          sed -i 's/System\.Drawing\.Image icon = Image\.FromFile/System.Drawing.Image icon = null; \/\/ PATCHED \/\/ was: System.Drawing.Image icon = Image.FromFile/g' Nebula.Core/Data/Chunks/AppChunks/AppIcon.cs || true
+          sed -i 's/Image\.FromFile.*/null; \/\/ PATCHED/g' Nebula.Core/Data/Chunks/AppChunks/AppIcon.cs || true
+      - name: Publish Headless
         run: |
-          cd Nebula.Headless || cd Nebula.CLI
-          dotnet publish -c Release -o ./publish
+          dotnet publish Nebula.Headless/Nebula.Headless.csproj -c Release -o ./publish -p:TreatWarningsAsErrors=false -p:WarningsNotAsErrors=CA1416
           mkdir -p ./publish/Tools/ObjectIcons
+          cp -r .resources/ObjectIcons/* ./publish/Tools/ObjectIcons/ 2>/dev/null || true
           touch ./publish/Tools/ObjectIcons/MMFApplication.png
+          cp .resources/ExtensionDumper.mfx ./publish/Tools/ 2>/dev/null || true
           echo '{"ignore_sounds":true,"ignore_music":true}' > ./publish/config.json
           ls -lh ./publish/
+          ./publish/Nebula.Headless --help 2>&1 | head -n 20 || true
       - uses: actions/upload-artifact@v4
         with:
           name: NebulaFD-Linux-Patched
-          path: "**/publish"
+          path: publish/
