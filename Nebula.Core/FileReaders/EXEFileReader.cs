@@ -1,4 +1,4 @@
-﻿using Ressy;
+using Ressy;
 using Nebula.Core.Data;
 using Nebula.Core.Data.PackageReaders;
 using Nebula.Core.Memory;
@@ -6,7 +6,6 @@ using Nebula.Core.Utilities;
 using System.Drawing;
 using System.Text;
 using TsudaKageyu;
-
 namespace Nebula.Core.FileReaders
 {
     public class EXEFileReader : IFileReader
@@ -14,165 +13,40 @@ namespace Nebula.Core.FileReaders
         public string Name => "Normal EXE";
         public Dictionary<int, Bitmap> Icons { get { return _icons; } set { _icons = value; } }
         private Dictionary<int, Bitmap> _icons = new Dictionary<int, Bitmap>();
-
         public string FilePath { get { return _filePath; } set { _filePath = value; } }
         public string _filePath = string.Empty;
-
         public CCNPackageData Package = new();
-
         public void LoadGame(ByteReader fileReader, string filePath)
         {
-            // Close and reopen quickly so iconextractor can read the file without locking issues 
             fileReader.Close();
-            loadIcons(_filePath = filePath);
+            _filePath = filePath;
             fileReader = new ByteReader(filePath, FileMode.Open);
-
             calculateEntryPoint(fileReader);
-
-            if (!fileReader.HasMemory(1)) // Check for Unpacked
+            if (!fileReader.HasMemory(1))
             {
                 try
                 {
                     PortableExecutable portableExecutable = new PortableExecutable(filePath);
-                    IReadOnlyList<ResourceIdentifier> resourceIdentifiers = portableExecutable.GetResourceIdentifiers();
-                    foreach (ResourceIdentifier identifier in resourceIdentifiers)
+                    var resourceIdentifiers = portableExecutable.GetResourceIdentifiers();
+                    foreach (var identifier in resourceIdentifiers)
                         if (identifier.Type.Code == 6 && identifier.Name.Code == 11)
                         {
                             Package.ModulesDir = Utilities.Utilities.ClearName(Encoding.Unicode.GetString(portableExecutable.GetResource(identifier).Data), '\\');
                             break;
                         }
-                }
-                catch {}
+                } catch {}
                 fileReader = new ByteReader(Path.ChangeExtension(filePath, "dat"), FileMode.Open);
                 NebulaCore.Unpacked = true;
             }
-
             Package.PackData.Read(fileReader);
             Package.Read(fileReader);
         }
-
-        public bool CheckInstaller(ByteReader fileReader)
-        {
-            calculateEntryPoint(fileReader);
-            string header = string.Empty;
-            if (fileReader.HasMemory(4))
-                header = fileReader.ReadAscii(4);
-            fileReader.Seek(0);
-            return header == "wwgT";
-        }
-
-        public bool CheckChowdren(ByteReader fileReader)
-        {
-            fileReader.Seek(60);
-            var hdrOffset = fileReader.ReadUShort();
-            fileReader.Seek(hdrOffset + 6);
-            var numOfSections = fileReader.ReadUShort();
-            fileReader.Skip(240);
-
-            bool isChowdren = false;
-            for (var i = 0; i < numOfSections; i++)
-            {
-                string header = fileReader.ReadAsciiStop(16);
-                fileReader.Skip(24);
-
-                if (isChowdren = header == ".gfids")
-                    break;
-            }
-            fileReader.Seek(0);
-            return isChowdren && File.Exists(Path.Combine(Path.GetDirectoryName(NebulaCore.FilePath)!, "Assets.dat"));
-        }
-
-        private void loadIcons(string gamePath)
-        {
-            var icoExt = new IconExtractor(gamePath);
-            var icos = IconUtil.Split(icoExt.GetIcon(0));
-
-            foreach (var icon in icos)
-            {
-                if (IconUtil.GetBitCount(icon) > 8 || icon.Width > 48)
-                    _icons.TryAdd(icon.Width == 48 ? 64 : icon.Width, icon.ToBitmap());
-            }
-
-            if (_icons.Count == 0)
-                foreach (var icon in icos)
-                    _icons.TryAdd(icon.Width == 48 ? 64 : icon.Width, icon.ToBitmap());
-
-            // 32-Bit 16x16
-            if (!_icons.ContainsKey(16))
-                _icons.Add(16, _icons[getLargestIcon()].ResizeImage(new Size(16, 16)));
-            // 32-Bit 32x32
-            if (!_icons.ContainsKey(32))
-                _icons.Add(32, _icons[getLargestIcon()].ResizeImage(new Size(32, 32)));
-            // 32-Bit 48x48 (Written as 64 for math reasons)
-            if (!_icons.ContainsKey(64))
-                _icons.Add(64, _icons[getLargestIcon()].ResizeImage(new Size(48, 48)));
-            // 32-Bit 128x128
-            if (!_icons.ContainsKey(128))
-                _icons.Add(128, _icons[getLargestIcon()].ResizeImage(new Size(128, 128)));
-            // 32-Bit 256x256
-            if (!_icons.ContainsKey(256))
-                _icons.Add(256, _icons[getLargestIcon()].ResizeImage(new Size(256, 256)));
-        }
-
-        private int getLargestIcon()
-        {
-            if (_icons.ContainsKey(256))
-                return 256;
-            else if (_icons.ContainsKey(128))
-                return 128;
-            else if (_icons.ContainsKey(64))
-                return 64;
-            else if (_icons.ContainsKey(32))
-                return 32;
-            else
-                return 16;
-        }
-
-        private void calculateEntryPoint(ByteReader exeReader)
-        {
-            var sig = exeReader.ReadAscii(2);
-            if (sig != "MZ")
-                this.Log("Invalid executable signature", ConsoleColor.Red);
-            exeReader.Seek(60);
-            var hdrOffset = exeReader.ReadUShort();
-            exeReader.Seek(hdrOffset + 6);
-            var numOfSections = exeReader.ReadUShort();
-            exeReader.Skip(240);
-
-            uint position = 0;
-            uint relocFallback = 0;
-            for (var i = 0; i < numOfSections; i++)
-            {
-                string sectionName = exeReader.ReadAsciiStop(8);
-                exeReader.Skip(8);
-                uint sectionStart = exeReader.ReadUInt();
-                uint sectionSize = exeReader.ReadUInt();
-                exeReader.Skip(16);
-
-                if (position == 0)
-                    position = sectionStart + sectionSize;
-                else
-                    position += sectionStart;
-
-                if (sectionName == ".reloc")
-                    relocFallback = sectionStart + sectionSize;
-            }
-
-            exeReader.Seek(position);
-            if (!exeReader.HasMemory(1) && relocFallback != position && relocFallback != 0)
-                exeReader.Seek(relocFallback);
-        }
-
+        public bool CheckInstaller(ByteReader fileReader) { calculateEntryPoint(fileReader); string header = string.Empty; if (fileReader.HasMemory(4)) header = fileReader.ReadAscii(4); fileReader.Seek(0); return header == "wwgT"; }
+        public bool CheckChowdren(ByteReader fileReader) { fileReader.Seek(60); var hdrOffset = fileReader.ReadUShort(); fileReader.Seek(hdrOffset + 6); var numOfSections = fileReader.ReadUShort(); fileReader.Skip(240); bool isChowdren = false; for (var i = 0; i < numOfSections; i++) { string header = fileReader.ReadAsciiStop(16); fileReader.Skip(24); if (isChowdren = header == ".gfids") break; } fileReader.Seek(0); return isChowdren && File.Exists(Path.Combine(Path.GetDirectoryName(NebulaCore.FilePath)!, "Assets.dat")); }
+        private void loadIcons(string gamePath) { try { var icoExt = new IconExtractor(gamePath); var icos = IconUtil.Split(icoExt.GetIcon(0)); foreach (var icon in icos) { if (IconUtil.GetBitCount(icon) > 8 || icon.Width > 48) _icons.TryAdd(icon.Width == 48 ? 64 : icon.Width, icon.ToBitmap()); } if (_icons.Count == 0) foreach (var icon in icos) _icons.TryAdd(icon.Width == 48 ? 64 : icon.Width, icon.ToBitmap()); if (!_icons.ContainsKey(16)) _icons.Add(16, _icons[getLargestIcon()].ResizeImage(new Size(16, 16))); if (!_icons.ContainsKey(32)) _icons.Add(32, _icons[getLargestIcon()].ResizeImage(new Size(32, 32))); if (!_icons.ContainsKey(64)) _icons.Add(64, _icons[getLargestIcon()].ResizeImage(new Size(48, 48))); if (!_icons.ContainsKey(128)) _icons.Add(128, _icons[getLargestIcon()].ResizeImage(new Size(128, 128))); if (!_icons.ContainsKey(256)) _icons.Add(256, _icons[getLargestIcon()].ResizeImage(new Size(256, 256))); } catch {} }
+        private int getLargestIcon() { if (_icons.ContainsKey(256)) return 256; else if (_icons.ContainsKey(128)) return 128; else if (_icons.ContainsKey(64)) return 64; else if (_icons.ContainsKey(32)) return 32; else return 16; }
+        private void calculateEntryPoint(ByteReader exeReader) { var sig = exeReader.ReadAscii(2); if (sig != "MZ") this.Log("Invalid executable signature", ConsoleColor.Red); exeReader.Seek(60); var hdrOffset = exeReader.ReadUShort(); exeReader.Seek(hdrOffset + 6); var numOfSections = exeReader.ReadUShort(); exeReader.Skip(240); uint position = 0; uint relocFallback = 0; for (var i = 0; i < numOfSections; i++) { string sectionName = exeReader.ReadAsciiStop(8); exeReader.Skip(8); uint sectionStart = exeReader.ReadUInt(); uint sectionSize = exeReader.ReadUInt(); exeReader.Skip(16); if (position == 0) position = sectionStart + sectionSize; else position += sectionStart; if (sectionName == ".reloc") relocFallback = sectionStart + sectionSize; } exeReader.Seek(position); if (!exeReader.HasMemory(1) && relocFallback != position && relocFallback != 0) exeReader.Seek(relocFallback); }
         public PackageData getPackageData() => Package!;
-
-        public IFileReader Copy()
-        {
-            EXEFileReader fileReader = new()
-            {
-                Package = Package,
-                Icons = _icons
-            };
-            return fileReader;
-        }
+        public IFileReader Copy() { EXEFileReader fileReader = new() { Package = Package, Icons = _icons }; return fileReader; }
     }
 }

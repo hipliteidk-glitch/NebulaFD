@@ -60,7 +60,7 @@ namespace Nebula
 
         public static void Init()
         {
-            ZLibInit.GlobalInit("zlibwapi.dll");
+            try { if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)) ZLibInit.GlobalInit("zlibwapi.dll"); else ZLibInit.GlobalInit("libz.so"); } catch { try { ZLibInit.GlobalInit("/data/data/com.termux/files/usr/lib/libz.so"); } catch {} }
         }
 
         public static string GameType()
