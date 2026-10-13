@@ -1,51 +1,19 @@
 name: Build Headless Fixed
 on:
- workflow_dispatch:
- push:
- branches: [2024-nebula]
-
+  workflow_dispatch:
+  push:
+    branches: [2024-nebula]
+    paths: ["Nebula.Headless/**"]
 jobs:
- build:
- runs-on: ubuntu-latest
- steps:
- - uses: actions/checkout@v4
- - uses: actions/setup-dotnet@v4
- with:
- dotnet-version: '8.0.x'
- - name: Fix Program.cs
- run: |
- cat > Nebula.Headless/Program.cs << 'CS'
- using Nebula;
- using Nebula.Core.FileReaders;
- using Nebula.Core.Memory;
- using Nebula.Core.Utilities;
- using System.IO;
- class Program {
- static void Main(string[] args){
- try{
- var exeDir = AppContext.BaseDirectory;
- Directory.SetCurrentDirectory(exeDir);
- string filePath = args.Length>0? args[0] : "";
- if (string.IsNullOrWhiteSpace(filePath)) { Console.WriteLine("Usage: dotnet Nebula.Headless.dll \"/path/to/game.exe\""); return; }
- if (!File.Exists(filePath)) { Console.WriteLine($"NOT FOUND: {filePath}"); return; }
- Console.WriteLine($"Using: {filePath}");
- try { NebulaCore.Init(); } catch {}
- NebulaCore.FilePath = filePath;
- var reader = new ByteReader(filePath, FileMode.Open);
- var fr = new EXEFileReader();
- NebulaCore.CurrentReader = fr;
- fr.LoadGame(reader, filePath);
- Console.WriteLine($"Loaded {NebulaCore.PackageData.AppName} Frames={NebulaCore.PackageData.Frames.Count}");
- Directory.CreateDirectory("Dumps");
- new Nebula.Tools.GameDumper.MFAParser().Execute();
- Console.WriteLine("DONE");
- }catch(Exception ex){ Console.WriteLine("FATAL: "+ex); }
- }
- }
- CS
- cat Nebula.Headless/Program.cs
- - run: dotnet build Nebula.Headless -c Release
- - uses: actions/upload-artifact@v4
- with:
- name: Nebula.Headless-fixed
- path: Nebula.Headless/bin/Release/net8.0/
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet build Nebula.Headless -c Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nebula.Headless-fixed
+          path: Nebula.Headless/bin/Release/net8.0/
